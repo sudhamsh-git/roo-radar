@@ -1,0 +1,79 @@
+:root {
+  --bg: #0b0f14; --panel: #131a22; --line: #253140; --text: #e8edf3; --muted: #93a1b0;
+  --amber: #f5a524; --red: #e5484d; --green: #30a46c; --blue: #3b82f6;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, select, input { font: inherit; }
+section { display: none; }
+body.screen-setup #setup, body.screen-drive #drive, body.screen-end #end { display: block; }
+
+/* ---------- setup ---------- */
+#setup, #end { max-width: 920px; margin: 0 auto; padding: 16px; }
+header .logo { font-size: 26px; font-weight: 800; letter-spacing: .2px; display: flex; align-items: center; gap: 10px; }
+header .logo .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 5px rgba(245,165,36,.2); }
+header .sub { color: var(--muted); margin: 2px 0 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 13px; }
+select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px; font-size: 15px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+label.check { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; }
+button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; font-size: 15px; }
+button.primary { background: var(--amber); color: #1a1205; border: none; font-weight: 700; padding: 12px 22px; }
+button.link { background: none; border: none; color: var(--muted); text-decoration: underline; padding: 4px; }
+.note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.chip { display: inline-block; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 12.5px; color: var(--muted); }
+.chip.ok { color: #bff0d3; border-color: #1f6b46; }
+.chip.bad { color: #ffd0d0; border-color: #7a2a2d; }
+
+/* ---------- drive (landscape phone) ---------- */
+#drive { position: fixed; inset: 0; overflow: hidden; }
+#map { position: absolute; inset: 0; right: 38%; background: #0f1620; }
+#hud { position: absolute; top: 0; right: 0; width: 38%; height: 100%; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: linear-gradient(180deg, #0b0f14, #0d131a); border-left: 1px solid var(--line); }
+#cam { position: absolute; right: 10px; bottom: 10px; width: calc(38% - 20px); aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); display: none; z-index: 5; }
+body.showcam.cond-B #cam { display: block; }
+#cam video, #cam canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#speedBox { position: relative; font-size: 64px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+#speedBox small { font-size: 16px; color: var(--muted); margin-left: 6px; font-weight: 600; }
+#speedBox.over #speed { color: var(--amber); }
+#limitSign { position: absolute; right: 4px; top: 0; width: 58px; height: 58px; border-radius: 50%; background: #fff; color: #111; border: 7px solid var(--red); display: grid; place-items: center; font-size: 22px; font-weight: 800; }
+.hud-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hidden { display: none !important; }
+.chip.zone { font-weight: 800; letter-spacing: .4px; color: #1a1205; border: none; }
+.chip.zone.high { background: var(--red); color: #fff; }
+.chip.zone.medium { background: var(--amber); }
+
+.banner { position: absolute; left: 12px; top: 12px; width: calc(62% - 24px); z-index: 1000; border-radius: 14px; padding: 12px 14px; background: rgba(19,26,34,.96); border: 2px solid var(--amber); box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: pop .25s ease-out; }
+.banner.high { border-color: var(--red); }
+.banner .b-title { font-size: 22px; font-weight: 800; }
+.banner.high .b-title { color: #ff8c8f; }
+.banner.medium .b-title, .banner.roo .b-title { color: var(--amber); }
+.banner .b-body { margin-top: 4px; font-size: 15px; line-height: 1.35; }
+.banner .b-adv { margin-top: 6px; font-size: 16px; font-weight: 700; }
+.banner .b-src { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+@keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+
+#flash { position: absolute; inset: 0; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(229,72,77,.92); font-size: 54px; font-weight: 900; text-align: center; }
+#flash small { font-size: 26px; font-weight: 800; margin-top: 6px; }
+#flash.on { animation: blink .35s steps(2) infinite; }
+@keyframes blink { 50% { background: rgba(120,10,15,.95); } }
+
+#toast { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%) translateY(30px); opacity: 0; transition: .3s; background: rgba(19,26,34,.95); border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; z-index: 1500; font-size: 14px; }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+#debug { display: none; position: absolute; left: 8px; bottom: 8px; z-index: 1600; font: 12px ui-monospace, monospace; background: rgba(0,0,0,.7); padding: 4px 8px; border-radius: 6px; }
+body.debug #debug { display: block; }
+
+/* condition A: no map, no alerts, speed only */
+#baseline { display: none; position: absolute; inset: 0; z-index: 900; background: var(--bg); flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+body.cond-A #baseline { display: flex; }
+body.cond-A #map, body.cond-A #hud { display: none; }
+.b-speed { font-size: 110px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.b-speed small { font-size: 24px; color: var(--muted); margin-left: 8px; }
+.b-msg { color: var(--muted); font-size: 18px; }
+
+.car-icon div { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 5px solid var(--amber); box-shadow: 0 0 0 6px rgba(245,165,36,.25); }
+.leaflet-container { background: #0f1620; }
+
+@media (orientation: portrait) {
+  body.screen-drive::after { content: "Rotate the phone to landscape"; position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 5000; font-size: 20px; }
+}
