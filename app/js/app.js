@@ -52,7 +52,7 @@
       });
       store.set('rr_settings', settings);
       const L = cfg.layouts[settings.layout];
-      $('layoutInfo').textContent = `Kangaroos: ${L.roos}. Distractors: ${L.distractors}.` + (settings.condition === 'B' ? ` Scripted: ${L.scripted}.` : ' No scripted errors in A.');
+      $('layoutInfo').textContent = `Kangaroos: ${L.roos}. Jump-out: ${L.jump}.` + (settings.condition === 'B' ? ` Scripted: ${L.scripted}.` : ' No false alarm in A.');
     };
     document.querySelectorAll('#setup select, #setup input').forEach(e => e.addEventListener('change', upd));
     upd();
