@@ -9,7 +9,7 @@
   let cfg, routes, S, D = null, map = null, mapLayers = [], carMarker = null;
   const settings = Object.assign({
     participant: 'P1', condition: 'B', route: 'R1', layout: 'X', drive: 1, preset: null,
-    camera: true, showCam: true, debug: false, code: Math.random().toString(36).slice(2, 7)
+    camera: true, showCam: true, debug: false, showReport: true, code: Math.random().toString(36).slice(2, 7)
   }, store.get('rr_settings', {}));
 
   /* ------------------------------------------------ boot */
@@ -40,6 +40,7 @@
     sel('sLayout', [['X', 'Layout X'], ['Y', 'Layout Y']], settings.layout);
     sel('sDrive', [['1', 'Drive 1'], ['2', 'Drive 2'], ['0', 'Practice']], String(settings.drive));
     sel('sPreset', Object.entries(cfg.timePresets).map(([k, v]) => [k, `${v.label} (dial ${k})`]), settings.preset);
+    $('sReport').checked = settings.showReport !== false;
     $('sCamera').checked = settings.camera; $('sShowCam').checked = settings.showCam; $('sDebug').checked = settings.debug;
     $('remoteCode').textContent = settings.code;
     $('layoutInfo').textContent = '';
@@ -47,7 +48,7 @@
       Object.assign(settings, {
         participant: $('sParticipant').value, condition: $('sCondition').value, route: $('sRoute').value,
         layout: $('sLayout').value, drive: parseInt($('sDrive').value, 10), preset: $('sPreset').value,
-        camera: $('sCamera').checked, showCam: $('sShowCam').checked, debug: $('sDebug').checked
+        camera: $('sCamera').checked, showReport: $('sReport').checked, showCam: $('sShowCam').checked, debug: $('sDebug').checked
       });
       store.set('rr_settings', settings);
       const L = cfg.layouts[settings.layout];
@@ -131,7 +132,10 @@
     D.timers.forEach(clearInterval);
     RR.vision.stopCamera();
     RR.log.add('drive_end', { reason, markersPassed: D.lastIdx });
+    const trip = tripReport(RR.log.events);
+    RR.log.add('trip_report', Object.assign({ shown: D.cond === 'B' && settings.showReport }, trip));
     RR.log.archive();
+    renderTrip(trip);
     RR.remote.status(`END ${settings.participant} drive ${settings.drive} (${reason})`);
     try { if (D_wake) D_wake.release(); } catch (e) { /* ignore */ }
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) { /* ignore */ }
@@ -152,6 +156,48 @@
       store.set('rr_settings', settings);
       document.body.className = 'screen-setup'; buildSetup();
     };
+  }
+
+  /* ------------------------------------------------ trip report (feedback to the driver) */
+  function tripReport(ev) {
+    const alerts = ev.filter(e => e.event === 'roo_alert');
+    const stops = ev.filter(e => e.event === 'stop').map(e => e.detail.stopped_at_ms != null ? e.detail.stopped_at_ms : e.t_ms);
+    const rts = [];
+    let inTime = 0;
+    for (const a of alerts) {
+      const s = stops.find(t => t >= a.t_ms && t - a.t_ms <= 4000);
+      if (s !== undefined) { inTime++; rts.push((s - a.t_ms) / 1000); }
+    }
+    const passes = ev.filter(e => e.event === 'marker_pass' && e.detail.speed_kmh != null);
+    const avg = xs => xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null;
+    const zone = passes.filter(e => e.detail.level !== 'low').map(e => e.detail.speed_kmh);
+    const out = passes.filter(e => e.detail.level === 'low').map(e => e.detail.speed_kmh);
+    return {
+      roo_alerts: alerts.length, stopped_in_time: inTime,
+      mean_reaction_s: rts.length ? +(rts.reduce((a, b) => a + b, 0) / rts.length).toFixed(2) : null,
+      speed_in_zones: avg(zone), speed_outside: avg(out),
+      zone_alerts: ev.filter(e => e.event === 'zone_alert').length
+    };
+  }
+
+  function renderTrip(t) {
+    const box = $('tripReport');
+    if (!(D.cond === 'B' && settings.showReport)) { box.classList.add('hidden'); return; }
+    let msg = 'Thanks for driving with Roo Radar.';
+    if (t.speed_in_zones != null && t.speed_outside != null) {
+      const d = t.speed_outside - t.speed_in_zones;
+      msg = d >= 5 ? `You slowed down by about ${d} km/h in kangaroo zones. Slower speeds give you more time to stop.`
+        : 'Your speed was about the same inside and outside kangaroo zones. Slowing down at dusk gives you more time to stop.';
+    }
+    box.innerHTML = `<h3>Your trip report</h3>
+      <div class="trip-grid">
+        <div><b>${t.roo_alerts}</b><span>kangaroo alerts</span></div>
+        <div><b>${t.stopped_in_time} of ${t.roo_alerts}</b><span>stopped within 4 s</span></div>
+        <div><b>${t.mean_reaction_s != null ? t.mean_reaction_s.toFixed(1) + ' s' : '-'}</b><span>average time to stop</span></div>
+        <div><b>${t.speed_in_zones != null ? t.speed_in_zones : '-'} / ${t.speed_outside != null ? t.speed_outside : '-'}</b><span>km/h in zones / outside</span></div>
+      </div>
+      <p>${msg}</p><p class="note">Simulation: toy-car speeds are scaled, not real km/h.</p>`;
+    box.classList.remove('hidden');
   }
 
   /* ------------------------------------------------ time + evidence */

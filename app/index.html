@@ -7,6 +7,9 @@
   <title>Roo Radar</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body class="screen-setup">
 
@@ -29,6 +32,7 @@
       <label class="check"><input type="checkbox" id="sCamera"> Use camera</label>
       <label class="check"><input type="checkbox" id="sShowCam"> Show camera preview</label>
       <label class="check"><input type="checkbox" id="sDebug"> Debug overlay</label>
+      <label class="check"><input type="checkbox" id="sReport"> Trip report after B drives</label>
     </div>
     <div class="row">
       <button id="btnCalib">Calibrate motion (car still, 3 s)</button>
@@ -82,6 +86,8 @@
   <!-- ============ END ============ -->
   <section id="end">
     <h2>Drive complete</h2>
+    <div id="tripReport" class="trip hidden"></div>
+    <h4 class="research">Researcher</h4>
     <p id="endSummary"></p>
     <div class="row">
       <button id="btnDownload" class="primary">Download log (CSV)</button>
@@ -101,5 +107,6 @@
   <script src="js/feedback.js"></script>
   <script src="js/vision.js"></script>
   <script src="js/app.js"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
 </body>
 </html>
