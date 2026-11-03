@@ -26,12 +26,13 @@ button.link { background: none; border: none; color: var(--muted); text-decorati
 .chip.ok { color: #bff0d3; border-color: #1f6b46; }
 .chip.bad { color: #ffd0d0; border-color: #7a2a2d; }
 
-/* ---------- drive (landscape phone) ---------- */
+/* ---------- drive (works upright or sideways) ---------- */
 #drive { position: fixed; inset: 0; overflow: hidden; }
 #map { position: absolute; inset: 0; right: 38%; background: #0f1620; }
 #hud { position: absolute; top: 0; right: 0; width: 38%; height: 100%; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: linear-gradient(180deg, #0b0f14, #0d131a); border-left: 1px solid var(--line); }
 #cam { position: absolute; right: 10px; bottom: 10px; width: calc(38% - 20px); aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); display: none; z-index: 5; }
-body.showcam.cond-B #cam { display: block; }
+body.showcam.cond-B #cam, body.showcam.debug #cam { display: block; }
+body.debug #cam { z-index: 950; }
 #cam video, #cam canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 #speedBox { position: relative; font-size: 64px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 #speedBox small { font-size: 16px; color: var(--muted); margin-left: 6px; font-weight: 600; }
@@ -74,8 +75,17 @@ body.cond-A #map, body.cond-A #hud { display: none; }
 .car-icon div { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 5px solid var(--amber); box-shadow: 0 0 0 6px rgba(245,165,36,.25); }
 .leaflet-container { background: #0f1620; }
 
+/* phone upright (portrait): map on top, speed and camera below */
 @media (orientation: portrait) {
-  body.screen-drive::after { content: "Rotate the phone to landscape"; position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 5000; font-size: 20px; }
+  #map { right: 0; bottom: 42%; }
+  #hud { top: auto; bottom: 0; width: 100%; height: 42%; border-left: none; border-top: 1px solid var(--line); padding: 12px 14px; }
+  #speedBox { font-size: 72px; }
+  #cam { width: 36%; aspect-ratio: 3/4; right: 12px; bottom: 12px; }
+  .banner { width: calc(100% - 24px); }
+  .banner .b-title { font-size: 21px; }
+  #flash { font-size: 44px; padding: 0 16px; }
+  #flash small { font-size: 22px; }
+  .b-speed { font-size: 96px; }
 }
 
 /* trip report */

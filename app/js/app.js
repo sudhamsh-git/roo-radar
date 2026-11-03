@@ -93,7 +93,7 @@
   /* ------------------------------------------------ drive */
   async function startDrive() {
     RR.fx.unlockAudio();
-    try { await document.documentElement.requestFullscreen(); await screen.orientation.lock('landscape'); } catch (e) { /* not supported */ }
+    try { await document.documentElement.requestFullscreen(); await screen.orientation.lock('portrait'); } catch (e) { /* not supported */ }
     try { if (navigator.wakeLock) D_wake = await navigator.wakeLock.request('screen'); } catch (e) { /* ignore */ }
     const route = routes[settings.route];
     D = {
