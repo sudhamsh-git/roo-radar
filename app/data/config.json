@@ -71,7 +71,8 @@
     "confThreshold": 0.45,
     "iouThreshold": 0.45,
     "minGapMs": 90,
-    "maxBoxArea": 1.0
+    "maxBoxArea": 1.0,
+    "cropTop": 0.3
   },
   "motion": {
     "moveThreshold": 6.0,
@@ -93,8 +94,16 @@
   "ntfyBase": "https://ntfy.sh",
   "actApi": "https://www.data.act.gov.au/resource/qw4j-6rbq.json",
   "green": {
-    "on": 0.02,
-    "off": 0.008,
+    "lines": [
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ],
+    "band": 0.05,
+    "on": 0.08,
+    "off": 0.03,
     "minGapMs": 900
   }
 }

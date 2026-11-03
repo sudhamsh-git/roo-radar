@@ -100,7 +100,7 @@
       running: true, cond: settings.condition, route, markers: route.markers.map(m => ({ ...m })),
       t: null, lastIdx: 0, lastPassT: 0, speed: null, moving: false, stillSince: null, everMoved: false,
       zone: 'low', hist: [], rooActive: false, rooLastSeen: 0, muteNext: false, detBusy: false, lastDet: 0,
-      finishedAt: null, live: null, timers: [], gIn: false, gLast: 0, gBase: [], gPeak: 0
+      finishedAt: null, live: null, timers: [], gB: null, gCount: 0
     };
     document.body.className = 'screen-drive cond-' + D.cond + (settings.showCam ? ' showcam' : '') + (settings.debug ? ' debug' : '');
     RR.log.start({
@@ -243,23 +243,28 @@
     if (settings.green) greenTick();
   }
 
-  /* Green M-cards lying on the road edge: count each card as it passes out of the bottom of the view.
-     Cards are counted in order (M1, M2, ...), so a card the camera misses can be added with N. */
+  /* Green M-cards lying on the road edge. Several trip lines across the left of the view each count the
+     cards crossing them; whichever line has counted the most is used, so the phone's tilt does not matter.
+     Cards are counted in order (M1, M2, ...); a card the camera misses can be added with N. */
   function greenTick() {
-    const f = RR.vision.greenFraction(), now = performance.now();
-    if (D.gBase.length < 8) { D.gBase.push(f); return; }            // first second at START = background level
-    const base = D.gBase.slice().sort((a, b) => a - b)[3];
-    const hi = base + (cfg.green ? cfg.green.on : 0.02), lo = base + (cfg.green ? cfg.green.off : 0.008);
-    if (settings.debug) $('dbgGreen').textContent = (f * 100).toFixed(1) + '%';
-    if (!D.gIn && f > hi) { D.gIn = true; D.gPeak = f; }
-    else if (D.gIn) {
-      D.gPeak = Math.max(D.gPeak, f);
-      if (f < lo) {
-        D.gIn = false;
-        if (now - D.gLast > (cfg.green ? cfg.green.minGapMs : 900) && D.lastIdx < D.markers.length) {
-          D.gLast = now; passMarker(D.lastIdx + 1, 'green', { size: D.gPeak });
-        }
+    const G = cfg.green || {}, lines = G.lines || [0.5, 0.6, 0.7, 0.8, 0.9], now = performance.now();
+    const fs = RR.vision.greenBands(lines, G.band || 0.05);
+    if (!D.gB) D.gB = lines.map(() => ({ base: [], on: false, n: 0, last: 0 }));
+    if (settings.debug) $('dbgGreen').textContent = fs.map(f => Math.round(f * 100)).join('/');
+    fs.forEach((f, i) => {
+      const B = D.gB[i];
+      if (B.base.length < 8) { B.base.push(f); return; }            // first second at START = background
+      const base = B.base.slice().sort((a, b) => a - b)[3];
+      if (!B.on && f > base + (G.on || 0.08)) B.on = true;
+      else if (B.on && f < base + (G.off || 0.03)) {
+        B.on = false;
+        if (now - B.last > (G.minGapMs || 900)) { B.n++; B.last = now; }
       }
+    });
+    const best = Math.max(...D.gB.map(B => B.n));
+    if (best > D.gCount) {
+      D.gCount = best;
+      if (D.lastIdx < D.markers.length) passMarker(D.lastIdx + 1, 'green', { size: Math.max(...fs) });
     }
   }
 
@@ -335,7 +340,7 @@
       D.detBusy = true;
       try {
         const t0 = performance.now();
-        const boxes = await RR.detector.detect(vid, vid.videoWidth, vid.videoHeight);
+        const boxes = await RR.detector.detect(vid, vid.videoWidth, vid.videoHeight, cfg.detector.cropTop || 0);
         if (settings.debug) $('dbgDet').textContent = `${Math.round(performance.now() - t0)} ms, ${boxes.length} box`;
         onBoxes(boxes, 'model');
       } catch (e) { RR.log.add('error', { where: 'detector', msg: e.message }); }

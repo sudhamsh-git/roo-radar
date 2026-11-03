@@ -25,13 +25,14 @@ window.RR = window.RR || {};
   }
 
   /* source: video or canvas. Returns boxes normalised to the source frame (0..1). */
-  async function detect(source, srcW, srcH) {
+  async function detect(source, srcW, srcH, y0 = 0) {
     if (!session) return [];
-    const scale = Math.min(size / srcW, size / srcH);
-    const w = Math.round(srcW * scale), h = Math.round(srcH * scale);
+    const cropY = Math.round(y0 * srcH), cropH = srcH - cropY;          // only the part of the frame from y0 down
+    const scale = Math.min(size / srcW, size / cropH);
+    const w = Math.round(srcW * scale), h = Math.round(cropH * scale);
     const px = Math.floor((size - w) / 2), py = Math.floor((size - h) / 2);
     ctx.fillStyle = 'rgb(114,114,114)'; ctx.fillRect(0, 0, size, size);
-    ctx.drawImage(source, 0, 0, srcW, srcH, px, py, w, h);
+    ctx.drawImage(source, 0, cropY, srcW, cropH, px, py, w, h);
     const rgba = ctx.getImageData(0, 0, size, size).data;
     const n = size * size, data = new Float32Array(3 * n);
     for (let i = 0; i < n; i++) {
@@ -45,10 +46,10 @@ window.RR = window.RR || {};
       let conf = 0;
       for (let c = 4; c < ch; c++) conf = Math.max(conf, d[c * na + a]);
       if (conf < cfg.confThreshold) continue;
-      const cx = d[a], cy = d[na + a], bw = d[2 * na + a], bh = d[3 * na + a];
+      const bx = d[a], by = d[na + a], bw = d[2 * na + a], bh = d[3 * na + a];
       boxes.push({
-        x1: Math.max(0, (cx - bw / 2 - px) / w), y1: Math.max(0, (cy - bh / 2 - py) / h),
-        x2: Math.min(1, (cx + bw / 2 - px) / w), y2: Math.min(1, (cy + bh / 2 - py) / h), conf
+        x1: Math.max(0, (bx - bw / 2 - px) / w), y1: y0 + (1 - y0) * Math.max(0, (by - bh / 2 - py) / h),
+        x2: Math.min(1, (bx + bw / 2 - px) / w), y2: y0 + (1 - y0) * Math.min(1, (by + bh / 2 - py) / h), conf
       });
     }
     boxes.sort((a, b) => b.conf - a.conf);

@@ -47,16 +47,23 @@ window.RR = window.RR || {};
     });
   }
 
-  /* Share of "card green" pixels in the left-lower part of the view (where the green M-cards pass). */
-  const gcan = document.createElement('canvas'); gcan.width = 60; gcan.height = 80;
+  /* Share of "card green" pixels in thin bands across the left part of the view (one value per band). */
+  const gcan = document.createElement('canvas'); gcan.width = 60; gcan.height = 200;
   const gctx = gcan.getContext('2d', { willReadFrequently: true });
-  function greenFraction() {
-    if (!video || !video.videoWidth) return 0;
+  function greenBands(lines, band) {
+    if (!video || !video.videoWidth) return lines.map(() => 0);
     const VW = video.videoWidth, VH = video.videoHeight;
-    gctx.drawImage(video, 0, 0.35 * VH, 0.55 * VW, 0.65 * VH, 0, 0, 60, 80);
-    const d = gctx.getImageData(0, 0, 60, 80).data; let n = 0;
-    for (let i = 0; i < d.length; i += 4) { const r = d[i], g = d[i + 1], b = d[i + 2]; if (g > 35 && g > r * 1.35 && g > b * 1.3) n++; }
-    return n / (60 * 80);
+    gctx.drawImage(video, 0, 0, 0.55 * VW, VH, 0, 0, 60, 200);
+    const d = gctx.getImageData(0, 0, 60, 200).data;
+    return lines.map(L => {
+      const r0 = Math.max(0, Math.round((L - band / 2) * 200)), r1 = Math.min(200, Math.round((L + band / 2) * 200));
+      let n = 0, t = 0;
+      for (let y = r0; y < r1; y++) for (let x = 0; x < 60; x++) {
+        const i = (y * 60 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2]; t++;
+        if (g > 35 && g > r * 1.35 && g > b * 1.3) n++;
+      }
+      return t ? n / t : 0;
+    });
   }
 
   /* Mean absolute difference between consecutive tiny grey frames (0-255). */
@@ -72,5 +79,5 @@ window.RR = window.RR || {};
     return diff;
   }
 
-  RR.vision = { startCamera, stopCamera, readMarkers, motion, video: () => video, greenFraction };
+  RR.vision = { startCamera, stopCamera, readMarkers, motion, video: () => video, greenBands };
 })(window.RR);
