@@ -13,7 +13,7 @@ window.RR = window.RR || {};
     video = videoEl;
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
     });
     video.srcObject = stream;
     await video.play();
@@ -23,19 +23,40 @@ window.RR = window.RR || {};
 
   function stopCamera() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; }
 
-  /* Read markers on a downscaled frame. Returns [{id, cx, cy, size}] normalised. */
-  function readMarkers(maxW = 560) {
+  /* Read markers. Passes rotate each call: the whole frame (downscaled), then the left and right
+     sides at higher resolution, where the roadside markers appear when the phone is upright.
+     Returns [{id, cx, cy, size}] normalised to the whole frame. */
+  let pass = 0;
+  function readMarkers() {
     if (!video || !video.videoWidth) return [];
-    const s = Math.min(1, maxW / video.videoWidth);
-    const w = Math.round(video.videoWidth * s), h = Math.round(video.videoHeight * s);
-    if (work.width !== w) { work.width = w; work.height = h; }
-    wctx.drawImage(video, 0, 0, w, h);
-    const img = wctx.getImageData(0, 0, w, h);
-    const found = detector.detect(img);
+    const VW = video.videoWidth, VH = video.videoHeight, portrait = VH > VW;
+    const regions = portrait
+      ? [[0, 0, 1, 1, 640], [0, 0.2, 0.6, 0.8, 900], [0.4, 0.2, 0.6, 0.8, 900]]
+      : [[0, 0, 1, 1, 960]];
+    const [rx, ry, rw, rh, maxW] = regions[pass++ % regions.length];
+    const sx = rx * VW, sy = ry * VH, sw = rw * VW, sh = rh * VH;
+    const s = Math.min(1, maxW / sw);
+    const w = Math.round(sw * s), h = Math.round(sh * s);
+    if (work.width !== w || work.height !== h) { work.width = w; work.height = h; }
+    wctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    const found = detector.detect(wctx.getImageData(0, 0, w, h));
     return found.map(m => {
       const xs = m.corners.map(c => c.x), ys = m.corners.map(c => c.y);
-      return { id: m.id, cx: (Math.min(...xs) + Math.max(...xs)) / 2 / w, cy: (Math.min(...ys) + Math.max(...ys)) / 2 / h, size: (Math.max(...xs) - Math.min(...xs)) / w };
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2 / w, cy = (Math.min(...ys) + Math.max(...ys)) / 2 / h;
+      return { id: m.id, cx: rx + cx * rw, cy: ry + cy * rh, size: (Math.max(...xs) - Math.min(...xs)) / w * rw };
     });
+  }
+
+  /* Share of "card green" pixels in the left-lower part of the view (where the green M-cards pass). */
+  const gcan = document.createElement('canvas'); gcan.width = 60; gcan.height = 80;
+  const gctx = gcan.getContext('2d', { willReadFrequently: true });
+  function greenFraction() {
+    if (!video || !video.videoWidth) return 0;
+    const VW = video.videoWidth, VH = video.videoHeight;
+    gctx.drawImage(video, 0, 0.35 * VH, 0.55 * VW, 0.65 * VH, 0, 0, 60, 80);
+    const d = gctx.getImageData(0, 0, 60, 80).data; let n = 0;
+    for (let i = 0; i < d.length; i += 4) { const r = d[i], g = d[i + 1], b = d[i + 2]; if (g > 35 && g > r * 1.35 && g > b * 1.3) n++; }
+    return n / (60 * 80);
   }
 
   /* Mean absolute difference between consecutive tiny grey frames (0-255). */
@@ -51,5 +72,5 @@ window.RR = window.RR || {};
     return diff;
   }
 
-  RR.vision = { startCamera, stopCamera, readMarkers, motion, video: () => video };
+  RR.vision = { startCamera, stopCamera, readMarkers, motion, video: () => video, greenFraction };
 })(window.RR);

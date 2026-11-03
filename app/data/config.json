@@ -1,6 +1,6 @@
 {
   "markerSpacingCm": 14,
-  "speedScaleKmhPerCmS": 6,
+  "speedScaleKmhPerCmS": 10.5,
   "routeMarkerIds": [
     1,
     2,
@@ -70,7 +70,8 @@
     "inputSize": 320,
     "confThreshold": 0.45,
     "iouThreshold": 0.45,
-    "minGapMs": 90
+    "minGapMs": 90,
+    "maxBoxArea": 1.0
   },
   "motion": {
     "moveThreshold": 6.0,
@@ -90,5 +91,10 @@
     }
   },
   "ntfyBase": "https://ntfy.sh",
-  "actApi": "https://www.data.act.gov.au/resource/qw4j-6rbq.json"
+  "actApi": "https://www.data.act.gov.au/resource/qw4j-6rbq.json",
+  "green": {
+    "on": 0.02,
+    "off": 0.008,
+    "minGapMs": 900
+  }
 }

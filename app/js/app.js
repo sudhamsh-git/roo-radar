@@ -9,7 +9,7 @@
   let cfg, routes, S, D = null, map = null, mapLayers = [], carMarker = null;
   const settings = Object.assign({
     participant: 'P1', condition: 'B', route: 'R1', layout: 'X', drive: 1, preset: null,
-    camera: true, showCam: true, debug: false, showReport: true, code: Math.random().toString(36).slice(2, 7)
+    camera: true, showCam: true, debug: false, showReport: true, green: true, code: Math.random().toString(36).slice(2, 7)
   }, store.get('rr_settings', {}));
 
   /* ------------------------------------------------ boot */
@@ -40,7 +40,7 @@
     sel('sLayout', [['X', 'Layout X'], ['Y', 'Layout Y']], settings.layout);
     sel('sDrive', [['1', 'Drive 1'], ['2', 'Drive 2'], ['0', 'Practice']], String(settings.drive));
     sel('sPreset', Object.entries(cfg.timePresets).map(([k, v]) => [k, `${v.label} (dial ${k})`]), settings.preset);
-    $('sReport').checked = settings.showReport !== false;
+    $('sReport').checked = settings.showReport !== false; $('sGreen').checked = settings.green !== false;
     $('sCamera').checked = settings.camera; $('sShowCam').checked = settings.showCam; $('sDebug').checked = settings.debug;
     $('remoteCode').textContent = settings.code;
     $('layoutInfo').textContent = '';
@@ -48,7 +48,7 @@
       Object.assign(settings, {
         participant: $('sParticipant').value, condition: $('sCondition').value, route: $('sRoute').value,
         layout: $('sLayout').value, drive: parseInt($('sDrive').value, 10), preset: $('sPreset').value,
-        camera: $('sCamera').checked, showReport: $('sReport').checked, showCam: $('sShowCam').checked, debug: $('sDebug').checked
+        camera: $('sCamera').checked, showReport: $('sReport').checked, showCam: $('sShowCam').checked, debug: $('sDebug').checked, green: $('sGreen').checked
       });
       store.set('rr_settings', settings);
       const L = cfg.layouts[settings.layout];
@@ -100,7 +100,7 @@
       running: true, cond: settings.condition, route, markers: route.markers.map(m => ({ ...m })),
       t: null, lastIdx: 0, lastPassT: 0, speed: null, moving: false, stillSince: null, everMoved: false,
       zone: 'low', hist: [], rooActive: false, rooLastSeen: 0, muteNext: false, detBusy: false, lastDet: 0,
-      finishedAt: null, live: null, timers: []
+      finishedAt: null, live: null, timers: [], gIn: false, gLast: 0, gBase: [], gPeak: 0
     };
     document.body.className = 'screen-drive cond-' + D.cond + (settings.showCam ? ' showcam' : '') + (settings.debug ? ' debug' : '');
     RR.log.start({
@@ -236,8 +236,30 @@
     if (settings.debug) $('dbgMarkers').textContent = found.map(f => `#${f.id}`).join(' ') || '-';
     for (const f of found) {
       if (cfg.timePresets[String(f.id)]) { if (String(f.id) !== settings.preset) { setPreset(String(f.id), 'dial'); toast('Time: ' + cfg.timePresets[String(f.id)].label); } continue; }
+      if (settings.green) continue;          // green-card counting is in charge of marker passes
       const idx = cfg.routeMarkerIds.indexOf(f.id) + 1;
       if (idx > D.lastIdx) passMarker(idx, 'camera', f);
+    }
+    if (settings.green) greenTick();
+  }
+
+  /* Green M-cards lying on the road edge: count each card as it passes out of the bottom of the view.
+     Cards are counted in order (M1, M2, ...), so a card the camera misses can be added with N. */
+  function greenTick() {
+    const f = RR.vision.greenFraction(), now = performance.now();
+    if (D.gBase.length < 8) { D.gBase.push(f); return; }            // first second at START = background level
+    const base = D.gBase.slice().sort((a, b) => a - b)[3];
+    const hi = base + (cfg.green ? cfg.green.on : 0.02), lo = base + (cfg.green ? cfg.green.off : 0.008);
+    if (settings.debug) $('dbgGreen').textContent = (f * 100).toFixed(1) + '%';
+    if (!D.gIn && f > hi) { D.gIn = true; D.gPeak = f; }
+    else if (D.gIn) {
+      D.gPeak = Math.max(D.gPeak, f);
+      if (f < lo) {
+        D.gIn = false;
+        if (now - D.gLast > (cfg.green ? cfg.green.minGapMs : 900) && D.lastIdx < D.markers.length) {
+          D.gLast = now; passMarker(D.lastIdx + 1, 'green', { size: D.gPeak });
+        }
+      }
     }
   }
 
@@ -256,6 +278,7 @@
     if (D.cond === 'B') moveCar(m);
     zoneLogic(idx, m);
     if (idx === D.markers.length) D.finishedAt = now;
+    if (settings.debug) { RR.fx.vibrate(30); toast(`M${idx} read`); }   // test mode: confirm each marker
   }
 
   function zoneLogic(idx, m) {
@@ -327,6 +350,8 @@
   }
 
   function onBoxes(boxes, source) {
+    // ignore boxes that fill most of the frame (camera blocked or something right against the lens)
+    boxes = boxes.filter(b => (b.x2 - b.x1) * (b.y2 - b.y1) <= (cfg.detector.maxBoxArea || 1));
     drawBoxes(boxes);
     const now = performance.now();
     D.hist.push(boxes.length > 0); if (D.hist.length > 3) D.hist.shift();

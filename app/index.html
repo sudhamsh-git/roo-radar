@@ -33,6 +33,7 @@
       <label class="check"><input type="checkbox" id="sShowCam"> Show camera preview</label>
       <label class="check"><input type="checkbox" id="sDebug"> Debug overlay</label>
       <label class="check"><input type="checkbox" id="sReport"> Trip report after B drives</label>
+      <label class="check"><input type="checkbox" id="sGreen"> Count green M cards (markers)</label>
     </div>
     <div class="row">
       <button id="btnCalib">Calibrate motion (car still, 3 s)</button>
@@ -80,7 +81,7 @@
     <div id="flash" class="hidden"><div>KANGAROO AHEAD</div><small>BRAKE · DON'T SWERVE</small></div>
     <div id="toast"></div>
 
-    <div id="debug">markers: <span id="dbgMarkers">-</span> · motion: <span id="dbgMotion">-</span> · det: <span id="dbgDet">-</span></div>
+    <div id="debug">markers: <span id="dbgMarkers">-</span> · motion: <span id="dbgMotion">-</span> · det: <span id="dbgDet">-</span> · green: <span id="dbgGreen">-</span></div>
   </section>
 
   <!-- ============ END ============ -->
