@@ -422,7 +422,7 @@
   /* ------------------------------------------------ UI */
   function uiTick() {
     if (!D || !D.running) return;
-    const sp = !D.moving && D.everMoved && performance.now() - D.lastPassT > 4000 ? 0 : D.speed;   // cards still passing = still driving
+    const sp = !D.moving && D.everMoved ? 0 : D.speed;
     $('speed').textContent = sp === null ? '--' : sp;
     $('speedBase').textContent = sp === null ? '--' : sp;
     const over = D.cond === 'B' && D.zone !== 'low' && sp > (D.advice || 999) + 5;
