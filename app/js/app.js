@@ -18,7 +18,8 @@
       .map(u => fetch(u).then(x => x.json())));
     cfg = c; routes = r; RR.risk.setGrid(g); RR.risk.setPoints(p);
     if (!settings.preset) settings.preset = cfg.defaultPreset;
-    if (settings.motion) Object.assign(cfg.motion, settings.motion);
+    if (settings.motion) Object.assign(cfg.motion, {   // old saved calibrations are capped too
+      stopThreshold: Math.min(4, settings.motion.stopThreshold || 2.5), moveThreshold: Math.min(9, settings.motion.moveThreshold || 6) });
     buildSetup();
     RR.remote.connect(cfg.ntfyBase, settings.code, onCommand, ok => setChip('chipRemote', ok ? 'Remote: connected' : 'Remote: offline', ok));
     RR.detector.load(cfg).then(() => setChip('chipModel', 'Detector: ready', true))
@@ -69,12 +70,12 @@
     try {
       await RR.vision.startCamera($('video'));
       const vals = [];
-      await new Promise(r => setTimeout(r, 600)); RR.vision.motion();
+      await new Promise(r => setTimeout(r, 2000)); RR.vision.motion();   // let the camera settle (focus, exposure) first
       await new Promise(r => { const iv = setInterval(() => { vals.push(RR.vision.motion()); if (vals.length >= 30) { clearInterval(iv); r(); } }, 100); });
       RR.vision.stopCamera();
       vals.sort((a, b) => a - b);
       const p95 = vals[Math.floor(vals.length * 0.95)];
-      const stop = Math.max(1.2, p95 * 1.6), move = Math.max(stop * 2, stop + 2);
+      const stop = Math.min(4, Math.max(1.2, p95 * 1.6)), move = Math.min(9, Math.max(stop * 2, stop + 2));   // capped so a shaky calibration can't block movement
       settings.motion = { stopThreshold: +stop.toFixed(2), moveThreshold: +move.toFixed(2) };
       Object.assign(cfg.motion, settings.motion); store.set('rr_settings', settings);
       $('motionInfo').textContent = `stop < ${stop.toFixed(1)}, move > ${move.toFixed(1)}`;
@@ -279,6 +280,7 @@
     else if (j - 2 > D.lastIdx) to = j - 2;                           // counted too few
     if (to === null || to === D.lastIdx) return;
     RR.log.add('count_fix', { from: D.lastIdx, to, seen: j }, `M${to}`);
+    if (to > D.lastIdx && to > 0) { passMarker(to, 'square_sync', null); return; }   // behind: catch up (speed + zone alerts)
     D.lastIdx = to; if (D.lastIdx < D.markers.length) D.finishedAt = null;
   }
 
@@ -436,7 +438,7 @@
   /* ------------------------------------------------ UI */
   function uiTick() {
     if (!D || !D.running) return;
-    const sp = !D.moving && D.everMoved ? 0 : D.speed;
+    const sp = !D.moving && D.everMoved && performance.now() - D.lastPassT > 3000 ? 0 : D.speed;   // markers passing = moving
     $('speed').textContent = sp === null ? '--' : sp;
     $('speedBase').textContent = sp === null ? '--' : sp;
     const over = D.cond === 'B' && D.zone !== 'low' && sp > (D.advice || 999) + 5;
