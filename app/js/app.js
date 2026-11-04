@@ -18,8 +18,7 @@
       .map(u => fetch(u).then(x => x.json())));
     cfg = c; routes = r; RR.risk.setGrid(g); RR.risk.setPoints(p);
     if (!settings.preset) settings.preset = cfg.defaultPreset;
-    if (settings.motion) Object.assign(cfg.motion, {   // old saved calibrations are capped too
-      stopThreshold: Math.min(4, settings.motion.stopThreshold || 2.5), moveThreshold: Math.min(9, settings.motion.moveThreshold || 6) });
+    if (settings.motion) Object.assign(cfg.motion, settings.motion);
     buildSetup();
     RR.remote.connect(cfg.ntfyBase, settings.code, onCommand, ok => setChip('chipRemote', ok ? 'Remote: connected' : 'Remote: offline', ok));
     RR.detector.load(cfg).then(() => setChip('chipModel', 'Detector: ready', true))
@@ -70,12 +69,12 @@
     try {
       await RR.vision.startCamera($('video'));
       const vals = [];
-      await new Promise(r => setTimeout(r, 2000)); RR.vision.motion();   // let the camera settle (focus, exposure) first
+      await new Promise(r => setTimeout(r, 600)); RR.vision.motion();
       await new Promise(r => { const iv = setInterval(() => { vals.push(RR.vision.motion()); if (vals.length >= 30) { clearInterval(iv); r(); } }, 100); });
       RR.vision.stopCamera();
       vals.sort((a, b) => a - b);
       const p95 = vals[Math.floor(vals.length * 0.95)];
-      const stop = Math.min(4, Math.max(1.2, p95 * 1.6)), move = Math.min(9, Math.max(stop * 2, stop + 2));   // capped so a shaky calibration can't block movement
+      const stop = Math.max(1.2, p95 * 1.6), move = Math.max(stop * 2, stop + 2);
       settings.motion = { stopThreshold: +stop.toFixed(2), moveThreshold: +move.toFixed(2) };
       Object.assign(cfg.motion, settings.motion); store.set('rr_settings', settings);
       $('motionInfo').textContent = `stop < ${stop.toFixed(1)}, move > ${move.toFixed(1)}`;
@@ -235,53 +234,38 @@
     let found;
     try { found = RR.vision.readMarkers(); } catch (e) { return; }
     if (settings.debug) $('dbgMarkers').textContent = found.map(f => `#${f.id}`).join(' ') || '-';
-    const seen = [];
     for (const f of found) {
       if (cfg.timePresets[String(f.id)]) { if (String(f.id) !== settings.preset) { setPreset(String(f.id), 'dial'); toast('Time: ' + cfg.timePresets[String(f.id)].label); } continue; }
+      if (settings.green) continue;          // green-card counting is in charge of marker passes
       const idx = cfg.routeMarkerIds.indexOf(f.id) + 1;
-      if (settings.green) { if (idx > 0) seen.push(idx); continue; }   // green cards count; squares only correct
       if (idx > D.lastIdx) passMarker(idx, 'camera', f);
     }
-    if (settings.green) { syncFromSquares(seen); greenTick(); }
+    if (settings.green) greenTick();
   }
 
   /* Green M-cards lying on the road edge. Several trip lines across the left of the view each count the
-     cards crossing them; the middle (median) count of the lines that see cards is used, so the tilt does not matter.
+     cards crossing them; whichever line has counted the most is used, so the phone's tilt does not matter.
      Cards are counted in order (M1, M2, ...); a card the camera misses can be added with N. */
   function greenTick() {
     const G = cfg.green || {}, lines = G.lines || [0.5, 0.6, 0.7, 0.8, 0.9], now = performance.now();
     const fs = RR.vision.greenBands(lines, G.band || 0.05);
-    if (!D.gB) D.gB = lines.map(() => ({ base: [], on: false, n: 0, last: 0, cnt: 0 }));
+    if (!D.gB) D.gB = lines.map(() => ({ base: [], on: false, n: 0, last: 0 }));
     if (settings.debug) $('dbgGreen').textContent = fs.map(f => Math.round(f * 100)).join('/');
     fs.forEach((f, i) => {
       const B = D.gB[i];
       if (B.base.length < 8) { B.base.push(f); return; }            // first second at START = background
       const base = B.base.slice().sort((a, b) => a - b)[3];
-      const want = B.on ? f > base + (G.off || 0.03) : f > base + (G.on || 0.08);
-      if (want !== B.on) { B.cnt++; if (B.cnt >= 2) { B.on = want; B.cnt = 0;      // must hold for 2 looks (no jitter)
-        if (!want && now - B.last > (G.minGapMs || 1200)) { B.n++; B.last = now; } } }
-      else B.cnt = 0;
+      if (!B.on && f > base + (G.on || 0.08)) B.on = true;
+      else if (B.on && f < base + (G.off || 0.03)) {
+        B.on = false;
+        if (now - B.last > (G.minGapMs || 900)) { B.n++; B.last = now; }
+      }
     });
-    // median of the lines that are counting: one line double-counting cannot push the total ahead
-    const ns = D.gB.map(B => B.n).filter(n => n > 0).sort((a, b) => a - b);
-    const count = ns.length ? ns[Math.floor((ns.length - 1) / 2)] : 0;
-    if (count > D.gCount) {
-      D.gCount = count;
+    const best = Math.max(...D.gB.map(B => B.n));
+    if (best > D.gCount) {
+      D.gCount = best;
       if (D.lastIdx < D.markers.length) passMarker(D.lastIdx + 1, 'green', { size: Math.max(...fs) });
     }
-  }
-
-  /* When the camera does read a black marker square, use its number to correct the green count. */
-  function syncFromSquares(ids) {
-    if (!ids.length) return;
-    const j = Math.min(...ids);                                       // nearest marker seen ahead
-    let to = null;
-    if (D.lastIdx >= j) to = j - 1;                                   // counted too far: that marker is still ahead
-    else if (j - 2 > D.lastIdx) to = j - 2;                           // counted too few
-    if (to === null || to === D.lastIdx) return;
-    RR.log.add('count_fix', { from: D.lastIdx, to, seen: j }, `M${to}`);
-    if (to > D.lastIdx && to > 0) { passMarker(to, 'square_sync', null); return; }   // behind: catch up (speed + zone alerts)
-    D.lastIdx = to; if (D.lastIdx < D.markers.length) D.finishedAt = null;
   }
 
   function passMarker(idx, source, f) {
@@ -345,7 +329,7 @@
         RR.log.add('stop', { motion: +v.toFixed(2), stopped_at_ms: Math.round(D.stillSince - RR.log.t0) }, D.lastIdx ? `M${D.lastIdx}` : '');
       }
     }
-    if (!settings.green && D.finishedAt && !D.moving && now - D.finishedAt > 2500) endDrive('finished');
+    if (D.finishedAt && !D.moving && now - D.finishedAt > 2500) endDrive('finished');
   }
 
   /* ------------------------------------------------ detector loop */
@@ -438,7 +422,7 @@
   /* ------------------------------------------------ UI */
   function uiTick() {
     if (!D || !D.running) return;
-    const sp = !D.moving && D.everMoved && performance.now() - D.lastPassT > 3000 ? 0 : D.speed;   // markers passing = moving
+    const sp = !D.moving && D.everMoved ? 0 : D.speed;
     $('speed').textContent = sp === null ? '--' : sp;
     $('speedBase').textContent = sp === null ? '--' : sp;
     const over = D.cond === 'B' && D.zone !== 'low' && sp > (D.advice || 999) + 5;

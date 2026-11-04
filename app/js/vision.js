@@ -60,7 +60,7 @@ window.RR = window.RR || {};
       let n = 0, t = 0;
       for (let y = r0; y < r1; y++) for (let x = 0; x < 60; x++) {
         const i = (y * 60 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2]; t++;
-        if (g > 18 && g > r * 1.35 && g > b * 1.3) n++;   // works in a dimmed room too
+        if (g > 35 && g > r * 1.35 && g > b * 1.3) n++;
       }
       return t ? n / t : 0;
     });
