@@ -80,7 +80,7 @@ body.cond-A #map, body.cond-A #hud { display: none; }
   #map { right: 0; bottom: 42%; }
   #hud { top: auto; bottom: 0; width: 100%; height: 42%; border-left: none; border-top: 1px solid var(--line); padding: 12px 14px; }
   #speedBox { font-size: 72px; }
-  #cam { width: 36%; aspect-ratio: 3/4; right: 12px; bottom: 12px; }
+  #cam { width: 34%; aspect-ratio: 9/16; right: 12px; bottom: 12px; }
   .banner { width: calc(100% - 24px); }
   .banner .b-title { font-size: 21px; }
   #flash { font-size: 44px; padding: 0 16px; }

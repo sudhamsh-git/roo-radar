@@ -104,6 +104,6 @@
     "band": 0.05,
     "on": 0.08,
     "off": 0.03,
-    "minGapMs": 900
+    "minGapMs": 1200
   }
 }
